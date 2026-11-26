@@ -1,0 +1,260 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Super Admin Check: Strictly verifies email AND email_verified == true, or trusted /admins/{uid} doc
+    function isAdmin() {
+      return isSignedIn() && (
+        (
+          'email' in request.auth.token &&
+          request.auth.token.email in ['younusali153885@gmail.com', 'bdyounus691@gmail.com'] &&
+          request.auth.token.email_verified == true
+        ) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Helpers
+    function isValidAppSettings(data) {
+      return data.licenseSystemEnabled is bool &&
+             data.appName is string && data.appName.size() >= 1 && data.appName.size() <= 100 &&
+             data.supportNumber is string && data.supportNumber.size() >= 1 && data.supportNumber.size() <= 40 &&
+             data.notificationEnabled is bool &&
+             (!('notificationTitle' in data) || data.notificationTitle == null || (data.notificationTitle is string && data.notificationTitle.size() <= 150)) &&
+             (!('notificationMessage' in data) || data.notificationMessage == null || (data.notificationMessage is string && data.notificationMessage.size() <= 1000)) &&
+             (!('promoBadge' in data) || data.promoBadge == null || (data.promoBadge is string && data.promoBadge.size() <= 50)) &&
+             (!('promoButtonText' in data) || data.promoButtonText == null || (data.promoButtonText is string && data.promoButtonText.size() <= 60)) &&
+             (!('promoActionUrl' in data) || data.promoActionUrl == null || (data.promoActionUrl is string && data.promoActionUrl.size() <= 500)) &&
+             (!('setupVideoEnabled' in data) || data.setupVideoEnabled == null || data.setupVideoEnabled is bool) &&
+             (!('setupVideoTitle' in data) || data.setupVideoTitle == null || (data.setupVideoTitle is string && data.setupVideoTitle.size() <= 150)) &&
+             (!('setupVideoUrl' in data) || data.setupVideoUrl == null || (data.setupVideoUrl is string && data.setupVideoUrl.size() <= 500)) &&
+             data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidLicensePackage(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.durationDays is int && data.durationDays >= 1 && data.durationDays <= 36500 &&
+             (data.price is int || data.price is float) && data.price >= 0 && data.price <= 1000000 &&
+             data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+             data.active is bool &&
+             data.maxVideoDuration is int && data.maxVideoDuration >= 0 && data.maxVideoDuration <= 100000 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 200)) &&
+             data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidLicenseKey(data) {
+      return data.key is string && data.key.size() >= 3 && data.key.size() <= 64 && data.key.matches('^[A-Z0-9_\\-]+$') &&
+             data.days is int && data.days >= 1 && data.days <= 36500 &&
+             (data.price is int || data.price is float) && data.price >= 0 && data.price <= 1000000 &&
+             data.status is string && data.status in ['inactive', 'active', 'suspended', 'expired'] &&
+             data.adminEmail is string && data.adminEmail in ['younusali153885@gmail.com', 'bdyounus691@gmail.com'] && data.adminEmail.size() <= 150 &&
+             data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+             data.maxVideoDuration is int && data.maxVideoDuration >= 0 && data.maxVideoDuration <= 100000 &&
+             (!('deviceId' in data) || data.deviceId == null || (data.deviceId is string && data.deviceId.size() <= 128)) &&
+             (!('activatedByUid' in data) || data.activatedByUid == null || (data.activatedByUid is string && data.activatedByUid.size() <= 128)) &&
+             (!('activatedAt' in data) || data.activatedAt == null || (data.activatedAt is string && data.activatedAt.size() <= 64)) &&
+             (!('expiresAt' in data) || data.expiresAt == null || (data.expiresAt is string && data.expiresAt.size() <= 64)) &&
+             (!('lastTransferredAt' in data) || data.lastTransferredAt == null || (data.lastTransferredAt is string && data.lastTransferredAt.size() <= 64)) &&
+             (!('note' in data) || data.note == null || (data.note is string && data.note.size() <= 200)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 1. Trusted Admin Lookup Collection (Read-only for owner, no client writes)
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    // 2. Global Settings & Promotions Collection
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(settingId) &&
+                       isValidAppSettings(incoming()) &&
+                       incoming().updatedBy == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'licenseSystemEnabled', 'appName', 'supportNumber',
+                         'notificationEnabled', 'updatedBy', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'licenseSystemEnabled', 'appName', 'supportNumber',
+                         'notificationEnabled', 'notificationTitle', 'notificationMessage',
+                         'promoBadge', 'promoButtonText', 'promoActionUrl',
+                         'setupVideoEnabled', 'setupVideoTitle', 'setupVideoUrl',
+                         'updatedBy', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isAdmin();
+
+      allow update: if (
+        isSignedIn() &&
+        isValidId(settingId) &&
+        isValidAppSettings(incoming()) &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().createdAt == existing().createdAt &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'licenseSystemEnabled', 'appName', 'supportNumber',
+          'notificationEnabled', 'notificationTitle', 'notificationMessage',
+          'promoBadge', 'promoButtonText', 'promoActionUrl',
+          'setupVideoEnabled', 'setupVideoTitle', 'setupVideoUrl',
+          'updatedBy', 'updatedAt'
+        ])
+      );
+
+      allow delete: if isSignedIn() && isValidId(settingId) && isAdmin();
+    }
+
+    // 3. License Packages Collection
+    match /packages/{packageId} {
+      allow get: if isValidId(packageId) && (existing().active == true || isAdmin());
+      allow list: if existing().active == true || isAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(packageId) &&
+                       isValidLicensePackage(incoming()) &&
+                       incoming().createdBy == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'name', 'durationDays', 'price', 'currency',
+                         'active', 'maxVideoDuration', 'createdBy', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'name', 'durationDays', 'price', 'currency',
+                         'active', 'maxVideoDuration', 'description',
+                         'createdBy', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isAdmin();
+
+      allow update: if (
+        isSignedIn() &&
+        isValidId(packageId) &&
+        isValidLicensePackage(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'durationDays', 'price', 'currency',
+          'active', 'maxVideoDuration', 'description', 'updatedAt'
+        ])
+      );
+
+      allow delete: if isSignedIn() && isValidId(packageId) && isAdmin();
+    }
+
+    // 4. License Keys Collection
+    match /licenses/{licenseId} {
+      allow get: if isValidId(licenseId);
+      allow list: if isSignedIn() && (existing().activatedByUid == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(licenseId) &&
+                       isValidLicenseKey(incoming()) &&
+                       incoming().createdBy == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'key', 'days', 'price', 'status', 'adminEmail',
+                         'createdBy', 'maxVideoDuration', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'key', 'days', 'price', 'status', 'adminEmail',
+                         'createdBy', 'maxVideoDuration', 'deviceId',
+                         'activatedByUid', 'activatedAt', 'expiresAt',
+                         'lastTransferredAt', 'note', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isAdmin();
+
+      allow update: if (
+        isValidId(licenseId) &&
+        isValidLicenseKey(incoming()) &&
+        incoming().key == existing().key &&
+        incoming().adminEmail == existing().adminEmail &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          // Action 1: Super Admin Full Control (extend, suspend/block, reactivate, unbind device, edit note)
+          (
+            isSignedIn() &&
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'days', 'price', 'status', 'maxVideoDuration',
+              'deviceId', 'activatedByUid', 'activatedAt',
+              'expiresAt', 'lastTransferredAt', 'note', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: User First-Time Activation (from 'inactive' or unbound 'active' -> 'active')
+          (
+            (
+              existing().status == 'inactive' ||
+              (existing().status == 'active' && (!('deviceId' in existing()) || existing().deviceId == null || existing().deviceId == ''))
+            ) &&
+            incoming().status == 'active' &&
+            incoming().days == existing().days &&
+            incoming().price == existing().price &&
+            incoming().maxVideoDuration == existing().maxVideoDuration &&
+            'deviceId' in incoming() && incoming().deviceId is string && incoming().deviceId.size() >= 4 && incoming().deviceId.size() <= 128 &&
+            'activatedAt' in incoming() && incoming().activatedAt is string && incoming().activatedAt.size() >= 10 &&
+            'expiresAt' in incoming() && incoming().expiresAt is string && incoming().expiresAt.size() >= 10 &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'deviceId', 'activatedByUid', 'activatedAt', 'expiresAt', 'updatedAt'
+            ])
+          ) ||
+          // Action 3: User Device Transfer (strictly when 'active', never when 'suspended' or 'expired')
+          (
+            existing().status == 'active' &&
+            incoming().status == 'active' &&
+            incoming().days == existing().days &&
+            incoming().price == existing().price &&
+            incoming().maxVideoDuration == existing().maxVideoDuration &&
+            'deviceId' in incoming() && incoming().deviceId is string && incoming().deviceId.size() >= 4 && incoming().deviceId.size() <= 128 &&
+            'lastTransferredAt' in incoming() && incoming().lastTransferredAt is string && incoming().lastTransferredAt.size() >= 10 &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'deviceId', 'activatedByUid', 'lastTransferredAt', 'updatedAt'
+            ])
+          ) ||
+          // Action 4: Automatic Expiry Transition when license duration ends on bound device
+          (
+            existing().status == 'active' &&
+            incoming().status == 'expired' &&
+            incoming().days == existing().days &&
+            incoming().price == existing().price &&
+            incoming().maxVideoDuration == existing().maxVideoDuration &&
+            incoming().deviceId == existing().deviceId &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'updatedAt'
+            ])
+          )
+        )
+      );
+
+      allow delete: if isSignedIn() && isValidId(licenseId) && isAdmin();
+    }
+  }
+}

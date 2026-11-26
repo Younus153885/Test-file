@@ -1,0 +1,6 @@
+{
+  "name": "GhostDevice",
+  "description": "Advanced Privacy Shield, Device Fingerprint & Identity Protection Manager with Real-time AI Privacy Analysis and Automated Security Reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

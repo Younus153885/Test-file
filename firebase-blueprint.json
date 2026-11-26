@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted administrator lookup record keyed by Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Verified administrator email address."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the admin record was created (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application settings, license system toggle, and in-app notification/promotion configuration.",
+      "type": "object",
+      "properties": {
+        "licenseSystemEnabled": {
+          "type": "boolean",
+          "description": "Whether the license key gate is active on app launch."
+        },
+        "appName": {
+          "type": "string",
+          "description": "Display name of the application."
+        },
+        "supportNumber": {
+          "type": "string",
+          "description": "Support phone/WhatsApp number displayed on the license activation screen."
+        },
+        "notificationEnabled": {
+          "type": "boolean",
+          "description": "Whether the in-app broadcast notification/promotion banner and modal are active."
+        },
+        "notificationTitle": {
+          "type": "string",
+          "description": "Headline title for the in-app notification or promotion."
+        },
+        "notificationMessage": {
+          "type": "string",
+          "description": "Detailed message body for the in-app notification or promotion."
+        },
+        "promoBadge": {
+          "type": "string",
+          "description": "Badge text displayed on the promotion modal (e.g., SPECIAL OFFER, NOTICE)."
+        },
+        "promoButtonText": {
+          "type": "string",
+          "description": "Action button label on the promotion modal."
+        },
+        "promoActionUrl": {
+          "type": "string",
+          "description": "Optional external URL opened when the user taps the promotion action button."
+        },
+        "setupVideoEnabled": {
+          "type": "boolean",
+          "description": "Whether the in-app YouTube setup video guide button and popup player are enabled."
+        },
+        "setupVideoTitle": {
+          "type": "string",
+          "description": "Custom display title for the setup video guide button and popup."
+        },
+        "setupVideoUrl": {
+          "type": "string",
+          "description": "YouTube video URL for the app setup tutorial."
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID of the administrator who last updated the settings."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "licenseSystemEnabled",
+        "appName",
+        "supportNumber",
+        "notificationEnabled",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LicensePackage": {
+      "title": "LicensePackage",
+      "description": "Subscription/license package plan displayed to users on the license activation screen.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Package display name."
+        },
+        "durationDays": {
+          "type": "integer",
+          "description": "Validity duration of the package in days."
+        },
+        "price": {
+          "type": "number",
+          "description": "Package price in BDT."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (e.g., BDT)."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the package is publicly visible."
+        },
+        "maxVideoDuration": {
+          "type": "integer",
+          "description": "Optional limit value displayed on the package card."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional feature description label shown on the package card."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of the administrator who created the package."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "name",
+        "durationDays",
+        "price",
+        "currency",
+        "active",
+        "maxVideoDuration",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LicenseKey": {
+      "title": "LicenseKey",
+      "description": "License key record binding a generated or custom key to a specific device and expiration period.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Unique uppercase license key string."
+        },
+        "days": {
+          "type": "integer",
+          "description": "Duration in days granted upon activation."
+        },
+        "price": {
+          "type": "number",
+          "description": "Price in BDT associated with this license key."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["inactive", "active", "suspended", "expired"],
+          "description": "Lifecycle status of the license key."
+        },
+        "adminEmail": {
+          "type": "string",
+          "description": "Authorized super admin email owning this license registry."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of the administrator who created the license."
+        },
+        "maxVideoDuration": {
+          "type": "integer",
+          "description": "Optional limit parameter."
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Hardware device identifier bound to this license upon activation."
+        },
+        "activatedByUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user who activated or transferred this license."
+        },
+        "activatedAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC timestamp when the license was activated."
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC timestamp when the license expires."
+        },
+        "lastTransferredAt": {
+          "type": "string",
+          "description": "ISO-8601 UTC timestamp when the license was last transferred."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional admin note or customer identifier."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "key",
+        "days",
+        "price",
+        "status",
+        "adminEmail",
+        "createdBy",
+        "maxVideoDuration",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted administrator lookup table keyed by UID."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/AppSettings" },
+      "description": "Global application settings, license system toggle, and in-app notification/promo config."
+    },
+    "/packages/{packageId}": {
+      "schema": { "$ref": "#/entities/LicensePackage" },
+      "description": "Publicly selectable license packages managed by the super administrator."
+    },
+    "/licenses/{licenseId}": {
+      "schema": { "$ref": "#/entities/LicenseKey" },
+      "description": "License keys created and controlled by the super administrator and activated by devices."
+    }
+  }
+}
